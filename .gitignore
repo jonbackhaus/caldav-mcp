@@ -26,3 +26,6 @@ data/
 
 # Spike output (may contain real calendar data)
 spike/out/
+
+# Beads / Dolt files (added by bd init)
+*.gate.lock*
