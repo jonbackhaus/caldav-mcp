@@ -1,0 +1,28 @@
+# Node / build
+node_modules/
+dist/
+*.tsbuildinfo
+coverage/
+
+# Runtime data (SQLite cache, audit log) and local secrets
+data/
+.env
+.env.*
+!.env.example
+
+# Beads / Dolt (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
+.beads/proxieddb/
+.beads.gate.lock
+.beads/issues.jsonl
+.beads/interactions.jsonl
+
+# Claude Code local state
+.claude/settings.local.json
+.claude/worktrees/
+.claude/scheduled_tasks.lock
+
+# Spike output (may contain real calendar data)
+spike/out/
