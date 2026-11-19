@@ -44,7 +44,7 @@ Mac container as fallback); we build it rather than adopt `ox-mcp`.
   Transports are thin adapters over it, which keeps D2's REST question cheap
   to answer either way.
 
-### D2. Transport: MCP over Streamable HTTP — **open: `decision` bead "client protocol"**
+### D2. Transport: MCP over Streamable HTTP — **decided 2026-11-19: MCP-only**
 
 The official `@modelcontextprotocol/sdk` server with the Streamable HTTP
 transport, in **stateless** mode (no session affinity; each request carries its
@@ -54,7 +54,7 @@ Open question: deterministic consumers like meal-planner can either
 (a) use the MCP client SDK and call tools (meal-planner already depends on the
 SDK), or (b) call a small REST/JSON endpoint (`GET /v1/events?...`) that runs
 the same core with the same auth.
-**Recommendation: (a) MCP-only for v1.** One surface to secure and test. Tools
+**Decided: (a) MCP-only for v1.** One surface to secure and test. Tools
 return `structuredContent` with a declared `outputSchema`, so programmatic
 callers get typed JSON, not prose. Add REST later only if a consumer can't
 reasonably speak MCP.
@@ -134,12 +134,12 @@ interface BrokerEvent {
   returned calendars) and `stale: boolean`. Freshness is visible per call, not
   only on `/health`.
 
-### D6. Time zones — **open: `decision` bead "reference timezone"**
+### D6. Time zones — **decided 2026-11-19: `America/New_York`**
 
 All-day and floating events have no zone, so the broker needs a **reference
 timezone** to place them on the timeline for overlap queries and Date
-conversion. **Recommendation:** one broker-wide IANA zone in config (the
-household's zone), with no per-client override in v1. Zoned events are
+conversion. **Decided:** one broker-wide IANA zone in config, default
+`America/New_York`, with no per-client override in v1. Zoned events are
 converted using their own VTIMEZONE (registered with ical.js per resource),
 falling back to the IANA database by TZID. Output offsets are in the event's
 own zone.
@@ -176,7 +176,7 @@ own zone.
 - Auth failure (revoked app-specific password, 401) is its own state. Retrying
   won't fix it, so it goes straight to `/health` as `auth_failed`.
 
-### D9. Observability — **open: `decision` bead "staleness alerting"**
+### D9. Observability — **decided 2026-11-19: healthchecks.io push**
 
 - `GET /health`: `200 {status:"ok", lastSuccessfulSyncAt, ageSeconds}`, or
   `503` with `status: "stale" | "auth_failed" | "starting"` once the age passes
@@ -185,8 +185,12 @@ own zone.
 - Recommendation: stale threshold = 30 min (6 missed syncs). Structured JSON
   logs to stdout. Never log tokens, passwords, or event content beyond
   ids/counts.
-- Open: which monitor pages (Uptime Kuma on the LAN, healthchecks.io push,
-  Slack webhook from the broker itself)?
+- **Paging: healthchecks.io dead-man's switch.** After each successful full
+  sync pass the broker pings a healthchecks.io check URL (kept in 1Password).
+  If the pings stop, for any reason (stale sync, `auth_failed`, crashed
+  broker, host down), healthchecks.io alerts a human. On `auth_failed` the
+  broker also pings the check's `/fail` endpoint so the alert fires at once.
+  The ping carries no calendar data. `/health` stays as the local diagnostic.
 
 ### D10. Secrets
 
@@ -195,15 +199,16 @@ The app-specific password and Apple ID come from a 1Password service account
 only token hashes, so it isn't secret. Startup fails fast and loudly if the
 credential is empty, so a missing secret is never treated as a sync error.
 
-### D11. Hosting — **open: `decision` bead "hosting target and LAN transport security"**
+### D11. Hosting — **decided 2026-11-19: R630 container, plain HTTP on the LAN**
 
 - A single OCI container (Node 22 slim), with the SQLite file on a volume.
   Run it on the **R630** (preferred, no macOS dependency) with a restart
   policy. The same image runs on the Mac container host as fallback.
-- **Transport security is open.** Bearer tokens over plain HTTP are sniffable
-  on the LAN. Options: (a) plain HTTP on a trusted LAN; (b) TLS terminated by
-  Caddy with an internal CA; (c) bind to a Tailscale interface only.
-  **Recommendation: (b) or (c)**, depending on what the R630 already runs.
+- **Transport: plain HTTP on the trusted LAN.** Accepted risk: anything on
+  the LAN segment can sniff a client token. Mitigations: tokens are scoped
+  and read-only, each one can be revoked alone, and the broker is not
+  exposed beyond the LAN (no port forward). Revisit TLS (Caddy + internal CA)
+  or Tailscale **before `calendar:write` ships** (D12).
 
 ### D12. CRUD pathway (not built in v1)
 
@@ -229,6 +234,8 @@ Adding writes is additive, with no architectural change:
 - **Cost:** we own recurrence/timezone correctness. That is the largest risk,
   and the fixture suite in D7 is how we contain it.
 - **Cost:** another long-running service to deploy and monitor.
+- **Accepted risk:** client tokens cross the LAN in cleartext (D11). That is
+  tolerable for read-only scopes, and must be revisited before write.
 - **Risk:** iCloud CalDAV behavior (shared and subscribed calendars, sync-token
   support, rate limits) is undocumented. The spike retires these before the
   cache design is frozen.
