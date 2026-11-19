@@ -60,18 +60,43 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
 
 ## Build & Test
 
-_Add your build and test commands here_
-
 ```bash
-# Example:
-# npm install
-# npm test
+pnpm install
+pnpm check        # typecheck (src + tests), biome lint, vitest, build — same as CI
+pnpm test:watch   # TDD loop
+pnpm format       # biome format --write
 ```
+
+Node >= 22, ESM, TypeScript strict (`noUncheckedIndexedAccess`,
+`exactOptionalPropertyTypes`, `verbatimModuleSyntax`). Tests live next to the
+code as `src/**/*.test.ts`. Write the failing test first.
 
 ## Architecture Overview
 
-_Add a brief overview of your project architecture_
+A long-running **calendar broker**: an MCP server (Streamable HTTP) that reads
+iCloud calendars over CalDAV and serves them to local agents/bots on the LAN.
+See `docs/adr/0001-broker-architecture.md` (a draft until its decision beads
+are ratified). Core invariants:
+
+- **The broker is the security boundary.** The iCloud app-specific password
+  grants full read/write to calendars and contacts and cannot be scoped. Only
+  the broker holds it; clients get per-client bearer tokens with scopes.
+- **Read-only first.** Write tools come later, gated by a `write` scope, with
+  `If-Match` ETags and an audit log. Until then no code path may issue
+  PUT/DELETE/PROPPATCH/MKCALENDAR against iCloud.
+- **Staleness is visible.** `/health` reports the age of the last successful
+  sync; never degrade silently.
 
 ## Conventions & Patterns
 
-_Add your project-specific conventions here_
+- **Decision beads** (`type: decision`) are never closed or ratified without
+  presenting them to the user and getting an explicit go-ahead.
+- **Secrets:** iCloud credentials and client tokens come from 1Password (`op`).
+  Never commit, log, or echo them; redact them in error messages. Read a secret
+  into a variable and test `[ -n "$VAR" ]` before use: a timed-out `op read`
+  yields an empty string with a clean exit.
+- **Real calendar data is private.** Spike output goes in `spike/out/`
+  (gitignored). Test fixtures must be synthetic or scrubbed `.ics`.
+- **Tests never hit iCloud.** Unit tests use synthetic fixtures; live checks
+  are opt-in scripts, not part of `pnpm test` or CI.
+- ADRs live in `docs/adr/NNNN-<slug>.md`.
