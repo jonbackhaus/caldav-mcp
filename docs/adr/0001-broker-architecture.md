@@ -59,7 +59,7 @@ return `structuredContent` with a declared `outputSchema`, so programmatic
 callers get typed JSON, not prose. Add REST later only if a consumer can't
 reasonably speak MCP.
 
-### D3. Auth and scopes — **open: `decision` bead "token and scope model"**
+### D3. Auth and scopes — **decided 2026-11-23**
 
 - **Per-client static bearer tokens**, not MCP's OAuth 2.1 flow. Every client
   is a headless bot on the LAN; an OAuth authorization server adds a lot of
@@ -79,11 +79,11 @@ reasonably speak MCP.
   Open sub-question: key the allowlist by **calendar ID** (the stable CalDAV
   collection URL; renaming a calendar doesn't widen or break access) or by
   **display name** (what meal-planner's config already uses).
-  **Recommendation:** store IDs. The config tool accepts names and resolves
+  **Decided:** store IDs. The config tool accepts names and resolves
   them to IDs once, and `list_calendars` shows both.
 - Unauthenticated: only `/health`, which reveals no calendar names or content.
 
-### D4. Event schema — **open: `decision` bead "event schema v1"**
+### D4. Event schema — **decided 2026-11-23 (with D5)**
 
 One JSON shape returned by every read tool. Each **occurrence** of a recurring
 event is a separate item, so consumers never see RRULEs unless they ask.
